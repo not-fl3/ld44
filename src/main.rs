@@ -382,6 +382,14 @@ fn main() {
             } => {
                 mode = Mode::Interact;
             }
+            Key { 
+                code: Enter, 
+                alt: true, 
+                .. 
+            } => {
+                let fullscreen = root.is_fullscreen();
+                root.set_fullscreen(!fullscreen);
+            }
             _ => {
                 mode = Mode::Walk;
             }
