@@ -1,17 +1,19 @@
+mod map;
+
 use tcod::map::FovAlgorithm;
-use tcod::{*, input::*, input::KeyCode::*};
 use rand::Rng;
 use tcod::colors::{BLACK, GREY};
+
+use noise::*;
 
 use tcod::{
     colors, console, console::*, input::KeyCode::*, input::*, BackgroundFlag, Color, Map,
     OffscreenConsole, RootConsole,
 };
 
-use noise::*;
 
 // We'll use a basic structure to define our tiles.
-#[derive(Copy, Clone)]
+#[derive(Clone,Debug)]
 pub struct Tile {
     x: i32,
     y: i32,
@@ -114,66 +116,10 @@ impl Object {
     }
 }
 
-fn create_room(room: Rect, tile_map: &mut Vec<Vec<Tile>>) {
-    print!("{:?}", room);
-
-    for x in (room.x + 1)..room.x+room.w {
-        for y in (room.y + 1)..room.y+room.h {
-            tile_map[x as usize][y as usize] = Tile::empty(x, y);
-        }
-    }
-}
-
-fn make_map(objects: &mut Vec<Object>, map_width: usize, map_height: usize) -> Vec<Vec<Tile>> {
-    let mut map = vec![vec![Tile::wall(); map_height]; map_width];
-
-    let mut rooms: Vec<Rect> = vec![];
-
-    for ( x, mut map_row) in map.iter_mut().enumerate() {
-        for(y, mut map_tile) in map_row.iter_mut().enumerate() {
-            if rand::random() {
-                *map_tile = Tile {
-                    x: x as i32,
-                    y: y as i32,
-                    walkable: false,
-                    transparent: false,
-                    description: String::from("This is a wall"),
-                    ch: '#',
-                };
-            } else {
-                *map_tile = Tile {
-                    x: x as i32,
-                    y: y as i32,
-                    walkable: true,
-                    transparent: true,
-                    description: String::from("Floor, you can step on it"),
-                    ch: '.',
-                }
-            }
-        }
-    }
-
-    for _ in 0..10 {
-        let height:i32 = rand::thread_rng().gen_range(MIN_ROOM_SIZE, MAX_ROOM_SIZE);
-        let width:i32 = rand::thread_rng().gen_range(MIN_ROOM_SIZE, MAX_ROOM_SIZE);
-
-        let x:i32 = rand::thread_rng().gen_range(0,(map_width as i32 - width));
-        let y:i32 = rand::thread_rng().gen_range(0,(map_height as i32 - height));
-
-        let room = Rect::new(x, y, width, height);
-
-        create_room(room, &mut map);
-    }
-
-    map
-}
-
 const FIELD_WIDTH: i32 = 80;
 const FIELD_HEIGHT: i32 = 80;
 const INFO_WIDTH: i32 = 45;
 const VIEW_RADIUS: f64 = 30.;
-const MIN_ROOM_SIZE: i32 = 10;
-const MAX_ROOM_SIZE: i32 = 20;
 
 fn panel<F: Fn(&mut OffscreenConsole, i32, i32)>(
     console: &mut RootConsole,
@@ -258,9 +204,9 @@ fn main() {
         .title("LifeTrader")
         .init();
 
-    let mut objects: Vec<Object>= Vec::new();
+    let mut objects: Vec<Object> = Vec::new();
 
-    let mut tile_map = make_map(&mut objects, FIELD_WIDTH as usize, FIELD_HEIGHT as usize);
+    let tile_map = map::make_map(&mut objects, FIELD_WIDTH as usize, FIELD_HEIGHT as usize, 1);
     let mut map = Map::new(FIELD_WIDTH, FIELD_HEIGHT);
 
     struct Pillon {
@@ -269,46 +215,8 @@ fn main() {
         w: i32,
         h: i32,
     };
-    let pillons = (0..30)
-        .map(|_| Pillon {
-            x: (rand::random::<f32>() * FIELD_WIDTH as f32) as i32,
-            y: (rand::random::<f32>() * FIELD_WIDTH as f32) as i32,
-            w: (rand::random::<f32>() * 5.) as i32 + 1,
-            h: (rand::random::<f32>() * 5.) as i32 + 1,
-        })
-        .collect::<Vec<_>>();
 
     // Set the map.
-    for x in 0..FIELD_WIDTH {
-        for y in 0..FIELD_HEIGHT {
-            // Place some walls randomly.
-            if x == 0
-                || y == 0
-                || x == FIELD_WIDTH - 1
-                || y == FIELD_HEIGHT - 1
-                || pillons.iter().any(|pillon| {
-                    x >= pillon.x
-                        && y >= pillon.y
-                        && x < pillon.x + pillon.w
-                        && y < pillon.y + pillon.h
-                })
-            {
-                tiles.push(Tile {
-                    x: x,
-                    y: y,
-                    ch: '#',
-                });
-                // Mark this place as non transparent, and non walkable.
-                map.set(x, y, false, false);
-            } else {
-                tiles.push(Tile {
-                    x: x,
-                    y: y,
-                    ch: '.',
-                });
-                // Mark this place as transparent and walkable.
-                map.set(x, y, true, true);
-            }
 
     for row in tile_map.iter() {
         for tile_entity in row.iter() {
@@ -332,27 +240,6 @@ fn main() {
 
         let noise = noise::Perlin::new();
 
-        for tile in tiles.iter() {
-            if map.is_in_fov(tile.x, tile.y) {
-                let tx = tile.x - x;
-                let ty = tile.y - y;
-                let r = ((tx * tx + ty * ty) as f64).sqrt() / VIEW_RADIUS;
-                let angle = (tx as f64 / ty as f64).atan();
-
-                let color = if noise.get([angle * 100., n as f64 / 20.]).abs() > r {
-                    Color::new(255, 180, 0)
-                } else {
-                    Color::new(255, 0, 0)
-                };
-                root.put_char_ex(tile.x, tile.y, tile.ch, color, Color::new(0, 0, 0));
-            } else {
-                root.put_char_ex(
-                    tile.x,
-                    tile.y,
-                    tile.ch,
-                    Color::new(55, 55, 55),
-                    Color::new(0, 0, 0),
-                );
         for tile_row in tile_map.iter() {
             for tile in tile_row.iter() {
                 if map.is_in_fov(tile.x, tile.y) {
