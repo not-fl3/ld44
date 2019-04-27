@@ -8,6 +8,7 @@ use noise::*;
 
 mod log;
 mod objects;
+mod trade;
 
 #[derive(Copy, Clone)]
 pub struct Tile {
@@ -45,7 +46,7 @@ pub struct Object {
     pub color: Color,
     pub kind: ObjectType,
     pub content: Vec<Item>,
-    pub is_opened: bool,
+    pub visited: bool,
 }
 
 impl Object {
@@ -73,6 +74,9 @@ pub enum Item {
         kind: ObjectType,
         description: String,
     },
+    Gold {
+        amount: i32,
+    },
 }
 
 impl Item {
@@ -84,6 +88,7 @@ impl Item {
             Item::Life {
                 ref description, ..
             } => description.as_str(),
+            Item::Gold { .. } => "gold",
         }
     }
 }
@@ -150,6 +155,31 @@ fn attack(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i
         return;
     }
     log::log("You beat the air in panic", colors::LIGHT_RED);
+}
+
+fn interact(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i32) {
+    let x = player.x + dx;
+    let y = player.y + dy;
+
+    if let Some(object) = get_object(x, y, objects) {
+        match object.kind {
+            ObjectType::Chest if object.visited => {
+                log::log(
+                    "You desperately opens the same chest again",
+                    colors::LIGHTER_RED,
+                );
+                log::log("Still nothing", colors::LIGHTER_RED);
+            }
+            ObjectType::Chest => {
+                log::log("You open a chest and start looting", colors::GREEN);
+                if object.content.len() == 0 {
+                    log::log("Loot fairy says no", colors::RED);
+                }
+                object.visited = true;
+            }
+            _ => {}
+        }
+    }
 }
 
 fn garbage_colect(objects: &mut Vec<Object>) {
@@ -296,11 +326,11 @@ fn main() {
     let mut map = Map::new(80, 80);
     let mut tiles = Vec::new();
 
-    log::log("You entered the tower of darkness.", colors::GREEN);
-    log::log("Your torch is going to fade out.", colors::GREY);
-    log::log("And your mind as well.", colors::DARKER_GREY);
+    log::log("You entered the tower of darkness", colors::GREEN);
+    log::log("Your torch is going to fade out", colors::GREY);
+    log::log("And your mind as well", colors::DARKER_GREY);
     log::log("You know exactly that your goal", colors::LIGHTER_GREY);
-    log::log("       is on the last floor.", colors::LIGHTER_GREY);
+    log::log("       is on the last floor", colors::LIGHTER_GREY);
 
     struct Pillon {
         x: i32,
@@ -359,6 +389,7 @@ fn main() {
         ..objects::player()
     };
     let mut mode = Mode::Walk;
+    //let mut trade = None;
 
     let mut objects = vec![];
     for tile in &tiles {
@@ -411,6 +442,7 @@ fn main() {
                 } else {
                     Color::new(150, 0, 0)
                 };
+
                 root.put_char_ex(tile.x, tile.y, tile.ch, color, Color::new(0, 0, 0));
             } else {
                 root.put_char_ex(
@@ -425,13 +457,13 @@ fn main() {
 
         for object in objects.iter() {
             if map.is_in_fov(object.x, object.y) {
-                root.put_char_ex(
-                    object.x,
-                    object.y,
-                    object.ch,
-                    object.color,
-                    Color::new(0, 0, 0),
-                );
+                let color = if object.kind == ObjectType::Chest && object.visited {
+                    colors::GREY
+                } else {
+                    object.color
+                };
+
+                root.put_char_ex(object.x, object.y, object.ch, color, Color::new(0, 0, 0));
             }
         }
 
@@ -466,7 +498,6 @@ fn main() {
             Key { printable: 'a', .. } => {
                 mode = Mode::Attack;
             }
-
             Key {
                 code: Enter,
                 alt: true,
@@ -488,7 +519,9 @@ fn main() {
                 Mode::Attack => {
                     attack(&mut player, &map, &mut objects, dx, dy);
                 }
-                Mode::Interact => {}
+                Mode::Interact => {
+                    interact(&mut player, &map, &mut objects, dx, dy);
+                }
             }
 
             mode = Mode::Walk;
