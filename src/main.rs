@@ -64,11 +64,29 @@ impl Object {
     }
 }
 
-pub struct Item {
-    description: String,
-    gold: i32,
+pub enum Item {
+    Thing {
+        description: String,
+        gold: i32,
+    },
+    Life {
+        kind: ObjectType,
+        description: String,
+    },
 }
 
+impl Item {
+    fn description(&self) -> &str {
+        match self {
+            Item::Thing {
+                ref description, ..
+            } => description.as_str(),
+            Item::Life {
+                ref description, ..
+            } => description.as_str(),
+        }
+    }
+}
 fn walk(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i32) {
     let x = player.x + dx;
     let y = player.y + dy;
@@ -117,8 +135,14 @@ fn attack(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i
         log::log("Your mind cant stand this level of violence", colors::RED);
         if object.kind == ObjectType::Chest {
             log::log("PURE INNOCENT CHEST!11", colors::RED);
+            log::log("Humanity decreased for nothing", colors::RED);
+        } else {
+            log::log("Humanity decreased", colors::RED);
+            player.content.push(Item::Life {
+                kind: object.kind,
+                description: object.description.clone(),
+            });
         }
-        log::log("Humanity decreased", colors::RED);
 
         player.humanity -= 1;
 
@@ -208,7 +232,11 @@ fn info_panel(player: &Object, console: &mut console::Root) {
         INFO_WIDTH,
         20,
         Some("Inventory"),
-        |_panel, _width, _| {},
+        |panel, _width, _| {
+            for (n, item) in player.content.iter().enumerate() {
+                panel.print(1, n as i32 + 1, format!(" - {}'s life", item.description()));
+            }
+        },
     );
 
     panel(
