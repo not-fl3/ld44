@@ -1,20 +1,21 @@
 mod map;
 
-use tcod::map::FovAlgorithm;
 use rand::Rng;
 use tcod::colors::{BLACK, GREY};
+use tcod::map::FovAlgorithm;
 
 use tcod::{
     colors, console, console::*, input::KeyCode::*, input::*, BackgroundFlag, Color, Map,
     OffscreenConsole, RootConsole,
 };
 
+use crate::map::make_map;
 use noise::*;
 
 mod log;
 mod objects;
 
-#[derive(Copy, Clone)]
+#[derive(Clone)]
 pub struct Tile {
     x: i32,
     y: i32,
@@ -25,7 +26,14 @@ pub struct Tile {
 }
 
 impl Tile {
-    pub fn new(x: i32, y: i32, ch: char, description: &str, walkable: bool, transparent: bool) -> Self {
+    pub fn new(
+        x: i32,
+        y: i32,
+        ch: char,
+        description: &str,
+        walkable: bool,
+        transparent: bool,
+    ) -> Self {
         Tile {
             x,
             y,
@@ -343,8 +351,9 @@ fn main() {
         .title("LifeTrader")
         .init();
 
-    let mut map = Map::new(80, 80);
-    let mut tiles = Vec::new();
+    let mut map = Map::new(FIELD_WIDTH, FIELD_HEIGHT);
+    let mut objects: Vec<Object> = vec![];
+    let mut tile_map = make_map(&mut objects, FIELD_WIDTH as usize, FIELD_HEIGHT as usize, 1);
 
     log::log("You entered the tower of darkness.", colors::GREEN);
     log::log("Your torch is going to fade out.", colors::GREY);
@@ -371,41 +380,47 @@ fn main() {
 
     for row in tile_map.iter() {
         for tile_entity in row.iter() {
-            map.set(tile_entity.x, tile_entity.y, tile_entity.transparent, tile_entity.walkable)
+            map.set(
+                tile_entity.x,
+                tile_entity.y,
+                tile_entity.transparent,
+                tile_entity.walkable,
+            )
         }
     }
 
     let mut n = 0;
 
     let mut player = Object {
-        x: 20,
-        y: 20,
+        x: FIELD_WIDTH / 2,
+        y: FIELD_HEIGHT / 2,
         ..objects::player()
     };
     let mut mode = Mode::Walk;
 
-    let mut objects = vec![];
-    for tile in &tiles {
-        if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 2000 == 0 {
-            objects.push(Object {
-                x: tile.x,
-                y: tile.y,
-                ..objects::chest()
-            });
-        }
-        if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 3100 == 0 {
-            objects.push(Object {
-                x: tile.x,
-                y: tile.y,
-                ..objects::graybeard()
-            });
-        }
-        if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 3100 == 0 {
-            objects.push(Object {
-                x: tile.x,
-                y: tile.y,
-                ..objects::frog()
-            });
+    for tile_row in tile_map.iter() {
+        for tile in tile_row.iter() {
+            if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 2000 == 0 {
+                objects.push(Object {
+                    x: tile.x,
+                    y: tile.y,
+                    ..objects::chest()
+                });
+            }
+            if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 3100 == 0 {
+                objects.push(Object {
+                    x: tile.x,
+                    y: tile.y,
+                    ..objects::graybeard()
+                });
+            }
+            if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 3100 == 0 {
+                objects.push(Object {
+                    x: tile.x,
+                    y: tile.y,
+                    ..objects::frog()
+                });
+            }
         }
     }
 
@@ -433,27 +448,29 @@ fn main() {
             }
         }
 
-        for tile in tiles.iter() {
-            if map.is_in_fov(tile.x, tile.y) {
-                let tx = tile.x - player.x;
-                let ty = tile.y - player.y;
-                let r = ((tx * tx + ty * ty) as f64).sqrt() / VIEW_RADIUS;
-                let angle = (tx as f64 / ty as f64).atan();
+        for tile_row in tile_map.iter() {
+            for tile in tile_row.iter() {
+                if map.is_in_fov(tile.x, tile.y) {
+                    let tx = tile.x - player.x;
+                    let ty = tile.y - player.y;
+                    let r = ((tx * tx + ty * ty) as f64).sqrt() / VIEW_RADIUS;
+                    let angle = (tx as f64 / ty as f64).atan();
 
-                let color = if noise.get([angle * 100., n as f64 / 20.]).abs() + 0.2 > r {
-                    Color::new(200, 160, 0)
+                    let color = if noise.get([angle * 100., n as f64 / 20.]).abs() + 0.2 > r {
+                        Color::new(200, 160, 0)
+                    } else {
+                        Color::new(150, 0, 0)
+                    };
+                    root.put_char_ex(tile.x, tile.y, tile.ch, color, Color::new(0, 0, 0));
                 } else {
-                    Color::new(150, 0, 0)
-                };
-                root.put_char_ex(tile.x, tile.y, tile.ch, color, Color::new(0, 0, 0));
-            } else {
-                root.put_char_ex(
-                    tile.x,
-                    tile.y,
-                    tile.ch,
-                    Color::new(55, 55, 55),
-                    Color::new(0, 0, 0),
-                );
+                    root.put_char_ex(
+                        tile.x,
+                        tile.y,
+                        tile.ch,
+                        Color::new(55, 55, 55),
+                        Color::new(0, 0, 0),
+                    );
+                }
             }
         }
 

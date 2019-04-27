@@ -1,6 +1,6 @@
 use crate::*;
 use std::f32::consts::PI;
-use tcod::chars::{DHLINE, DNE, DNW, DVLINE, DSE, DSW, DTEES, DTEEW, DTEEE, DTEEN, DCROSS};
+use tcod::chars::{DCROSS, DHLINE, DNE, DNW, DSE, DSW, DTEEE, DTEEN, DTEES, DTEEW, DVLINE};
 
 type TileMap = Vec<Vec<Tile>>;
 
@@ -12,7 +12,7 @@ pub fn make_map(
 ) -> TileMap {
     let mut map = vec![vec![Tile::wall(); map_height]; map_width];
 
-    let rooms: Vec<Rect> = vec![];
+    //    let rooms: Vec<Rect> = vec![];
 
     fill_empty(&mut map);
     draw_circle(floor_number, &mut map);
@@ -56,7 +56,6 @@ fn smooth_walls(map: &mut TileMap) {
     for x in 1..map.len() - 1 {
         for y in 1..map[x].len() - 1 {
             if !map[x][y].walkable {
-
                 if !map[x + 1][y].walkable
                     && !map[x - 1][y].walkable
                     && !map[x][y + 1].walkable
@@ -193,12 +192,12 @@ fn make_rooms(floor_number: i32, map: &mut TileMap) {
     draw_circle(floor_number + 3, map);
     draw_circle(floor_number + 8, map);
 
-    let random_angle = rand::thread_rng().gen_range(PI*0.2, PI*0.4);
+    let random_angle = rand::thread_rng().gen_range(PI * 0.2, PI * 0.4);
     let mut current_ray_angle = random_angle;
 
-    while current_ray_angle <= PI*2. {
-        let mut t :f32 = 0.;
-        let step= 0.1;
+    while current_ray_angle <= PI * 2. {
+        let mut t: f32 = 0.;
+        let step = 0.1;
 
         let mut hit_first_wall = false;
         while t <= radius {
@@ -224,37 +223,37 @@ fn make_rooms(floor_number: i32, map: &mut TileMap) {
 
         current_ray_angle += random_angle;
     }
-//    let mut t :f32 = 0.;
-//    let step= 0.01;
-//
-//    while t < PI * 2 {
-//        let x = center + radius * t.cos();
-//        let y = center + radius * t.sin();
-//
-//        t += step;
-//    }
-//    for _ in 0..10 {
-//        let height: i32 = rand::thread_rng().gen_range(MIN_ROOM_SIZE, MAX_ROOM_SIZE);
-//        let width: i32 = rand::thread_rng().gen_range(MIN_ROOM_SIZE, MAX_ROOM_SIZE);
-//
-//        let x: i32 = rand::thread_rng().gen_range(0, FIELD_WIDTH as i32 - width);
-//        let y: i32 = rand::thread_rng().gen_range(0, FIELD_HEIGHT as i32 - height);
-//
-//        let room = Rect::new(x, y, width, height);
-//
-//        create_room(room, map);
-//    }
+    //    let mut t :f32 = 0.;
+    //    let step= 0.01;
+    //
+    //    while t < PI * 2 {
+    //        let x = center + radius * t.cos();
+    //        let y = center + radius * t.sin();
+    //
+    //        t += step;
+    //    }
+    //    for _ in 0..10 {
+    //        let height: i32 = rand::thread_rng().gen_range(MIN_ROOM_SIZE, MAX_ROOM_SIZE);
+    //        let width: i32 = rand::thread_rng().gen_range(MIN_ROOM_SIZE, MAX_ROOM_SIZE);
+    //
+    //        let x: i32 = rand::thread_rng().gen_range(0, FIELD_WIDTH as i32 - width);
+    //        let y: i32 = rand::thread_rng().gen_range(0, FIELD_HEIGHT as i32 - height);
+    //
+    //        let room = Rect::new(x, y, width, height);
+    //
+    //        create_room(room, map);
+    //    }
 }
 
-fn create_room(room: Rect, map: &mut TileMap) {
-    print!("{:?}", room);
-
-    for x in (room.x + 1)..room.x + room.w {
-        for y in (room.y + 1)..room.y + room.h {
-            map[x as usize][y as usize] = Tile::empty(x, y);
-        }
-    }
-}
+//fn create_room(room: Rect, map: &mut TileMap) {
+//    print!("{:?}", room);
+//
+//    for x in (room.x + 1)..room.x + room.w {
+//        for y in (room.y + 1)..room.y + room.h {
+//            map[x as usize][y as usize] = Tile::empty(x, y);
+//        }
+//    }
+//}
 
 fn fill_empty(map: &mut TileMap) {
     for (x, map_row) in map.iter_mut().enumerate() {
