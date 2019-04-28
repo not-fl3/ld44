@@ -10,7 +10,7 @@ pub fn player() -> Object {
         description: "The human player".into(),
         kind: ObjectType::Character,
         color: colors::WHITE,
-        is_opened: false,
+        visited: false,
         content: vec![],
     }
 }
@@ -24,7 +24,7 @@ pub fn chest() -> Object {
         description: "The old chest".into(),
         kind: ObjectType::Chest,
         color: colors::DARK_BLUE,
-        is_opened: false,
+        visited: false,
         content: vec![],
     }
 }
@@ -38,7 +38,7 @@ pub fn graybeard() -> Object {
         description: "Graybeard trader".into(),
         kind: ObjectType::Character,
         color: colors::WHITE,
-        is_opened: false,
+        visited: false,
         content: vec![],
     }
 }
@@ -52,7 +52,7 @@ pub fn frog() -> Object {
         description: "The weird frog".into(),
         kind: ObjectType::Character,
         color: colors::GREEN,
-        is_opened: false,
+        visited: false,
         content: vec![],
     }
 }
@@ -66,7 +66,7 @@ pub fn garbage() -> Object {
         description: "Garbage".into(),
         kind: ObjectType::Garbage,
         color: colors::WHITE,
-        is_opened: false,
+        visited: false,
         content: vec![],
     }
 }

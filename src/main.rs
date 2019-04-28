@@ -15,6 +15,7 @@ use tcod::chars::BLOCK1;
 
 mod log;
 mod objects;
+mod trade;
 
 #[derive(Clone)]
 pub struct Tile {
@@ -80,11 +81,11 @@ pub struct Rect {
     transparent: bool,
 }
 
-const FIELD_WIDTH: i32 = 80;
-const FIELD_HEIGHT: i32 = 80;
-const INFO_WIDTH: i32 = 45;
-const HELP_HEIGHT: i32 = 5;
-const VIEW_RADIUS: f64 = 30.;
+pub const FIELD_WIDTH: i32 = 80;
+pub const FIELD_HEIGHT: i32 = 80;
+pub const INFO_WIDTH: i32 = 45;
+pub const HELP_HEIGHT: i32 = 5;
+pub const VIEW_RADIUS: f64 = 20.;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum Mode {
@@ -110,7 +111,7 @@ pub struct Object {
     pub color: Color,
     pub kind: ObjectType,
     pub content: Vec<Item>,
-    pub is_opened: bool,
+    pub visited: bool,
 }
 
 impl Object {
@@ -139,6 +140,9 @@ pub enum Item {
         kind: ObjectType,
         description: String,
     },
+    Gold {
+        amount: i32,
+    },
 }
 
 impl Item {
@@ -150,6 +154,7 @@ impl Item {
             Item::Life {
                 ref description, ..
             } => description.as_str(),
+            Item::Gold { .. } => "gold",
         }
     }
 }
@@ -168,7 +173,11 @@ fn walk(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i32
             && object.y == y
     }) {
         log::log(
-            &format!("{} prevent you from moving", object.description),
+            &format!(
+                "You cant pass {}{}",
+                object.description.chars().next().unwrap().to_lowercase(),
+                &object.description[1..]
+            ),
             colors::DARKER_RED,
         );
         return;
@@ -212,17 +221,50 @@ fn attack(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i
 
         player.humanity -= 1;
 
-        std::mem::replace(object, objects::player());
+        std::mem::replace(object, objects::garbage());
         return;
     }
     log::log("You beat the air in panic", colors::LIGHT_RED);
+}
+
+fn interact(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i32) {
+    let x = player.x + dx;
+    let y = player.y + dy;
+
+    if let Some(object) = get_object(x, y, objects) {
+        match object.kind {
+            ObjectType::Chest if object.visited => {
+                log::log(
+                    "You desperately opens the same chest again",
+                    colors::LIGHTER_RED,
+                );
+                log::log("Still nothing", colors::LIGHTER_RED);
+            }
+            ObjectType::Chest => {
+                log::log("You open a chest and start looting", colors::GREEN);
+                if object.content.len() == 0 {
+                    log::log("Loot fairy says no", colors::RED);
+                }
+                object.visited = true;
+            }
+            ObjectType::Character => {
+                let index = objects
+                    .iter()
+                    .position(|object| object.x == x && object.y == y);
+                if let Some(index) = index {
+                    trade::open_window(index);
+                }
+            }
+            _ => {}
+        }
+    }
 }
 
 fn garbage_colect(objects: &mut Vec<Object>) {
     objects.retain(|object| object.kind != ObjectType::Garbage);
 }
 
-fn panel<F: Fn(&mut OffscreenConsole, i32, i32)>(
+pub fn panel<F: Fn(&mut OffscreenConsole, i32, i32)>(
     console: &mut RootConsole,
     x: i32,
     y: i32,
@@ -271,7 +313,7 @@ fn info_panel(player: &Object, console: &mut console::Root) {
                 2,
                 BackgroundFlag::Set,
                 TextAlignment::Right,
-                "Your gold:",
+                "Gold:",
             );
             panel.print_ex(
                 width / 2,
@@ -279,6 +321,13 @@ fn info_panel(player: &Object, console: &mut console::Root) {
                 BackgroundFlag::Set,
                 TextAlignment::Right,
                 "Humanity:",
+            );
+            panel.print_ex(
+                width / 2,
+                4,
+                BackgroundFlag::Set,
+                TextAlignment::Right,
+                "Floor:",
             );
             for (n, _) in (0..player.humanity).enumerate() {
                 panel.put_char(
@@ -363,26 +412,11 @@ fn main() {
     let mut objects: Vec<Object> = vec![];
     let mut tile_map = make_map(&mut objects, FIELD_WIDTH as usize, FIELD_HEIGHT as usize, 1);
 
-    log::log("You entered the tower of darkness.", colors::GREEN);
-    log::log("Your torch is going to fade out.", colors::GREY);
-    log::log("And your mind as well.", colors::DARKER_GREY);
+    log::log("You entered the tower of darkness", colors::GREEN);
+    log::log("Your torch is going to fade out", colors::GREY);
+    log::log("And your mind as well", colors::DARKER_GREY);
     log::log("You know exactly that your goal", colors::LIGHTER_GREY);
-    log::log("       is on the last floor.", colors::LIGHTER_GREY);
-
-    struct Pillon {
-        x: i32,
-        y: i32,
-        w: i32,
-        h: i32,
-    };
-    let pillons = (0..30)
-        .map(|_| Pillon {
-            x: (rand::random::<f32>() * FIELD_WIDTH as f32) as i32,
-            y: (rand::random::<f32>() * FIELD_WIDTH as f32) as i32,
-            w: (rand::random::<f32>() * 5.) as i32 + 1,
-            h: (rand::random::<f32>() * 5.) as i32 + 1,
-        })
-        .collect::<Vec<_>>();
+    log::log("       is on the last floor", colors::LIGHTER_GREY);
 
     // Set the map.
 
@@ -405,6 +439,7 @@ fn main() {
         ..objects::player()
     };
     let mut mode = Mode::Walk;
+    //let mut trade = None;
 
     for tile_row in tile_map.iter() {
         for tile in tile_row.iter() {
@@ -415,7 +450,7 @@ fn main() {
                     ..objects::chest()
                 });
             }
-            if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 3100 == 0 {
+            if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 310 == 0 {
                 objects.push(Object {
                     x: tile.x,
                     y: tile.y,
@@ -489,13 +524,13 @@ fn main() {
 
         for object in objects.iter() {
             if map.is_in_fov(object.x, object.y) {
-                root.put_char_ex(
-                    object.x,
-                    object.y,
-                    object.ch,
-                    object.color,
-                    Color::new(0, 0, 0),
-                );
+                let color = if object.kind == ObjectType::Chest && object.visited {
+                    colors::GREY
+                } else {
+                    object.color
+                };
+
+                root.put_char_ex(object.x, object.y, object.ch, color, Color::new(0, 0, 0));
             }
         }
 
@@ -507,55 +542,58 @@ fn main() {
 
         info_panel(&player, &mut root);
 
-        root.flush();
+        if trade::process(&mut root, &mut player, &mut objects) == false {
+            root.flush();
+            let key = root.wait_for_keypress(true);
 
-        let key = root.wait_for_keypress(true);
-        let mut direction = None;
-        match key {
-            Key { code: Up, .. } => {
-                direction = Some((0, -1));
-            }
-            Key { code: Down, .. } => {
-                direction = Some((0, 1));
-            }
-            Key { code: Right, .. } => {
-                direction = Some((1, 0));
-            }
-            Key { code: Left, .. } => {
-                direction = Some((-1, 0));
-            }
-            Key { printable: 'e', .. } => {
-                mode = Mode::Interact;
-            }
-            Key { printable: 'a', .. } => {
-                mode = Mode::Attack;
+            let mut direction = None;
+            match key {
+                Key { code: Up, .. } => {
+                    direction = Some((0, -1));
+                }
+                Key { code: Down, .. } => {
+                    direction = Some((0, 1));
+                }
+                Key { code: Right, .. } => {
+                    direction = Some((1, 0));
+                }
+                Key { code: Left, .. } => {
+                    direction = Some((-1, 0));
+                }
+                Key { printable: 'e', .. } => {
+                    mode = Mode::Interact;
+                }
+                Key { printable: 'a', .. } => {
+                    mode = Mode::Attack;
+                }
+                Key {
+                    code: Enter,
+                    alt: true,
+                    ..
+                } => {
+                    let fullscreen = root.is_fullscreen();
+                    root.set_fullscreen(!fullscreen);
+                }
+                _ => {
+                    mode = Mode::Walk;
+                }
             }
 
-            Key {
-                code: Enter,
-                alt: true,
-                ..
-            } => {
-                let fullscreen = root.is_fullscreen();
-                root.set_fullscreen(!fullscreen);
-            }
-            _ => {
+            if let Some((dx, dy)) = direction {
+                match mode {
+                    Mode::Walk => {
+                        walk(&mut player, &map, &mut objects, dx, dy);
+                    }
+                    Mode::Attack => {
+                        attack(&mut player, &map, &mut objects, dx, dy);
+                    }
+                    Mode::Interact => {
+                        interact(&mut player, &map, &mut objects, dx, dy);
+                    }
+                }
+
                 mode = Mode::Walk;
             }
-        }
-
-        if let Some((dx, dy)) = direction {
-            match mode {
-                Mode::Walk => {
-                    walk(&mut player, &map, &mut objects, dx, dy);
-                }
-                Mode::Attack => {
-                    attack(&mut player, &map, &mut objects, dx, dy);
-                }
-                Mode::Interact => {}
-            }
-
-            mode = Mode::Walk;
         }
 
         garbage_colect(&mut objects);
