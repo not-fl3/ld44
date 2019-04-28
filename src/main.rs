@@ -1,6 +1,5 @@
 mod map;
 
-use rand::Rng;
 use tcod::colors::{BLACK, GREY, WHITE};
 use tcod::map::FovAlgorithm;
 
@@ -9,7 +8,10 @@ use tcod::{
     OffscreenConsole, RootConsole,
 };
 
-use crate::map::make_map;
+use crate::{
+    map::make_map,
+    objects::{Object, ObjectType},
+};
 use noise::*;
 use tcod::chars::BLOCK1;
 
@@ -86,6 +88,7 @@ pub const FIELD_HEIGHT: i32 = 80;
 pub const INFO_WIDTH: i32 = 45;
 pub const HELP_HEIGHT: i32 = 5;
 pub const VIEW_RADIUS: f64 = 20.;
+pub const FLOORS: usize = 3;
 
 #[derive(PartialEq, Debug, Clone, Copy)]
 enum Mode {
@@ -93,45 +96,6 @@ enum Mode {
     Interact,
     Attack,
     Observe,
-}
-
-#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
-pub enum ObjectType {
-    Chest,
-    Character,
-    Garbage,
-    Door,
-}
-
-pub struct Object {
-    pub x: i32,
-    pub y: i32,
-    pub ch: char,
-    pub humanity: i32,
-    pub description: String,
-    pub color: Color,
-    pub kind: ObjectType,
-    pub content: Vec<Item>,
-    pub visited: bool,
-    pub opened: bool,
-    pub life_equivalent: i32,
-}
-
-impl Object {
-    fn is_walkable(&self) -> bool {
-        match self.kind {
-            ObjectType::Chest => true,
-            ObjectType::Character => false,
-            ObjectType::Garbage => false,
-            ObjectType::Door => self.opened,
-        }
-    }
-
-    fn is_attackable(&self) -> bool {
-        match self.kind {
-            _ => false,
-        }
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Hash, Eq)]
@@ -161,7 +125,7 @@ impl Item {
     fn gold(&self) -> i32 {
         match self {
             Item::Thing { gold, .. } => *gold,
-            Item::Life { .. } => 1,
+            Item::Life { .. } => 3,
         }
     }
 }
@@ -239,6 +203,7 @@ fn interact(
     map: &mut Map,
     objects: &mut [Object],
     trade: &mut trade::Trade,
+    current_floor: &mut usize,
     dx: i32,
     dy: i32,
 ) {
@@ -311,7 +276,46 @@ fn interact(
                     }
                 }
             }
-            _ => {}
+            ObjectType::UpStair => {
+                if *current_floor < FLOORS - 1 {
+                    let gold = player.content.iter().fold(0, |sum, item| sum + item.gold());
+                    if gold < 20 {
+                        log::log(
+                            &format!("Your cost should be more than 20 gold. You cost {}", gold),
+                            colors::DARK_RED,
+                        );
+                        log::log(&format!("You cost {}", gold), colors::DARK_RED);
+                    } else {
+                        player.content.clear();
+                        *current_floor += 1;
+                        log::log(
+                            "All your item sacrificied to the door.",
+                            colors::LIGHTER_RED,
+                        );
+                        log::log(
+                            "You ascended to the next level of the tower.",
+                            colors::LIGHTER_RED,
+                        );
+                    }
+                } else {
+                    log::log(
+                        "That stair is broken and buried with rocks",
+                        colors::DARK_GREY,
+                    );
+                }
+            }
+            ObjectType::DownStair => {
+                if *current_floor > 0 {
+                    *current_floor -= 1;
+                    log::log("You escaped back in panic.", colors::DARK_RED);
+                } else {
+                    log::log(
+                        "That stair is broken and buried with rocks",
+                        colors::DARK_GREY,
+                    );
+                }
+            }
+            ObjectType::Garbage => {}
         }
     }
 }
@@ -456,33 +460,22 @@ fn info_panel(player: &Object, console: &mut console::Root) {
                 ),
             );
             panel.print(1, 2, "e - interact");
-            panel.print(1, 3, ">/< - ascent/descent");
             panel.print(25, 1, "a - violently take life");
             panel.print(25, 2, "; - toggle observe mode");
         },
     );
 }
 
-fn main() {
-    let mut root = RootConsole::initializer()
-        .size(FIELD_WIDTH + INFO_WIDTH, FIELD_HEIGHT + HELP_HEIGHT)
-        .title("LifeTrader")
-        .init();
+struct Floor {
+    map: Map,
+    objects: Vec<Object>,
+    tile_map: map::TileMap,
+}
 
+fn make_floor(n: i32) -> Floor {
+    let mut objects = vec![];
     let mut map = Map::new(FIELD_WIDTH, FIELD_HEIGHT);
-    let mut objects: Vec<Object> = vec![];
-    let mut tile_map = make_map(&mut objects, FIELD_WIDTH as usize, FIELD_HEIGHT as usize, 1);
-    let mut observe_x = 0;
-    let mut observe_y = 1;
-
-    log::log("You entered the tower of darkness", colors::GREEN);
-    log::log("Your torch is going to fade out", colors::GREY);
-    log::log("And your mind as well", colors::DARKER_GREY);
-    log::log("You know exactly that your goal", colors::LIGHTER_GREY);
-    log::log("       is on the last floor", colors::LIGHTER_GREY);
-
-    // Set the map.
-
+    let tile_map = make_map(&mut objects, FIELD_WIDTH as usize, FIELD_HEIGHT as usize, n);
     for row in tile_map.iter() {
         for tile_entity in row.iter() {
             map.set(
@@ -493,16 +486,6 @@ fn main() {
             )
         }
     }
-
-    let mut n = 0;
-
-    let mut player = Object {
-        x: 10,
-        y: 10,
-        ..objects::player()
-    };
-    let mut mode = Mode::Walk;
-    let mut trade = trade::Trade::default();
 
     for tile_row in tile_map.iter() {
         for tile in tile_row.iter() {
@@ -530,11 +513,64 @@ fn main() {
         }
     }
 
+    objects.push(Object {
+        x: FIELD_WIDTH / 2 - 1,
+        y: FIELD_HEIGHT / 2,
+        ..objects::upstairs()
+    });
+    objects.push(Object {
+        x: FIELD_WIDTH / 2 + 1,
+        y: FIELD_HEIGHT / 2,
+        ..objects::downstairs()
+    });
+    Floor {
+        map,
+        tile_map,
+        objects,
+    }
+}
+
+fn main() {
+    let mut root = RootConsole::initializer()
+        .size(FIELD_WIDTH + INFO_WIDTH, FIELD_HEIGHT + HELP_HEIGHT)
+        .title("LifeTrader")
+        .init();
+
+    let mut floors = vec![];
+
+    for n in 0..FLOORS {
+        floors.push(make_floor(n as i32 + 1));
+    }
+
+    let mut observe_x = 0;
+    let mut observe_y = 1;
+
+    log::log("You entered the tower of darkness", colors::GREEN);
+    log::log("Your torch is going to fade out", colors::GREY);
+    log::log("And your mind as well", colors::DARKER_GREY);
+    log::log("You know exactly that your goal", colors::LIGHTER_GREY);
+    log::log("       is on the last floor", colors::LIGHTER_GREY);
+
+    // Set the map.
+
+    let mut n = 0;
+
+    let mut player = Object {
+        x: 10,
+        y: 10,
+        ..objects::player()
+    };
+    let mut mode = Mode::Walk;
+    let mut trade = trade::Trade::default();
+    let mut current_floor = 0;
+
     while !root.window_closed() {
+        let mut floor = &mut floors[current_floor];
+
         n += 1;
         root.clear();
 
-        map.compute_fov(
+        floor.map.compute_fov(
             player.x,
             player.y,
             VIEW_RADIUS as i32,
@@ -544,9 +580,9 @@ fn main() {
 
         let noise = noise::Perlin::new();
 
-        for tile_row in tile_map.iter() {
+        for tile_row in floor.tile_map.iter() {
             for tile in tile_row.iter() {
-                if map.is_in_fov(tile.x, tile.y) {
+                if floor.map.is_in_fov(tile.x, tile.y) {
                     root.put_char(tile.x, tile.y, tile.ch, BackgroundFlag::Set);
                 } else {
                     root.put_char_ex(tile.x, tile.y, tile.ch, GREY, BLACK);
@@ -554,9 +590,9 @@ fn main() {
             }
         }
 
-        for tile_row in tile_map.iter() {
+        for tile_row in floor.tile_map.iter() {
             for tile in tile_row.iter() {
-                if map.is_in_fov(tile.x, tile.y) {
+                if floor.map.is_in_fov(tile.x, tile.y) {
                     let tx = tile.x - player.x;
                     let ty = tile.y - player.y;
                     let r = ((tx * tx + ty * ty) as f64).sqrt() / VIEW_RADIUS;
@@ -585,8 +621,8 @@ fn main() {
             }
         }
 
-        for object in objects.iter() {
-            if map.is_in_fov(object.x, object.y) {
+        for object in floor.objects.iter() {
+            if floor.map.is_in_fov(object.x, object.y) {
                 let color = if object.kind == ObjectType::Chest && object.visited {
                     colors::GREY
                 } else {
@@ -617,12 +653,12 @@ fn main() {
                 colors::WHITE,
                 colors::DARKER_BLUE,
             );
-            if let Some(object) = get_object(observe_x, observe_y, &mut objects) {
+            if let Some(object) = get_object(observe_x, observe_y, &mut floor.objects) {
                 root.print(0, FIELD_HEIGHT - 1, &object.description);
             } else {
-                if map.is_in_fov(observe_x, observe_y) == false {
+                if floor.map.is_in_fov(observe_x, observe_y) == false {
                     root.print(0, FIELD_HEIGHT - 1, "You cant see clearly in the dark");
-                } else if map.is_walkable(observe_x, observe_y) == false {
+                } else if floor.map.is_walkable(observe_x, observe_y) == false {
                     root.print(0, FIELD_HEIGHT - 1, "Blank wall");
                 } else {
                     root.print(0, FIELD_HEIGHT - 1, "Nothing");
@@ -631,7 +667,7 @@ fn main() {
         }
         info_panel(&player, &mut root);
 
-        if trade.process(&mut root, &mut player, &mut objects) == false {
+        if trade.process(&mut root, &mut player, &mut floor.objects) == false {
             root.flush();
             let key = root.wait_for_keypress(true);
 
@@ -663,6 +699,7 @@ fn main() {
                     observe_x = player.x;
                     observe_y = player.y;
                 }
+
                 Key {
                     code: Enter,
                     alt: true,
@@ -679,15 +716,23 @@ fn main() {
             if let Some((dx, dy)) = direction {
                 match mode {
                     Mode::Walk => {
-                        walk(&mut player, &mut map, &mut objects, dx, dy);
+                        walk(&mut player, &mut floor.map, &mut floor.objects, dx, dy);
                         mode = Mode::Walk;
                     }
                     Mode::Attack => {
-                        attack(&mut player, &mut map, &mut objects, dx, dy);
+                        attack(&mut player, &mut floor.map, &mut floor.objects, dx, dy);
                         mode = Mode::Walk;
                     }
                     Mode::Interact => {
-                        interact(&mut player, &mut map, &mut objects, &mut trade, dx, dy);
+                        interact(
+                            &mut player,
+                            &mut floor.map,
+                            &mut floor.objects,
+                            &mut trade,
+                            &mut current_floor,
+                            dx,
+                            dy,
+                        );
                         mode = Mode::Walk;
                     }
                     Mode::Observe => {
@@ -710,6 +755,6 @@ fn main() {
             }
         }
 
-        garbage_colect(&mut objects);
+        garbage_colect(&mut floor.objects);
     }
 }

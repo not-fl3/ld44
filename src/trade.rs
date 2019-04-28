@@ -5,7 +5,7 @@ use tcod::{
     *,
 };
 
-use crate::{panel, Item, Object};
+use crate::{objects::Object, panel, Item};
 
 #[derive(Debug, Clone, Default)]
 struct Deservables {
@@ -46,7 +46,7 @@ impl Trade {
             if *key != 0 {
                 player.content[*key as usize - 1].gold() * value + sum
             } else {
-                sum
+                sum + value * 3
             }
         });
         if (*self.selected.get(&0).unwrap_or(&0) == 1

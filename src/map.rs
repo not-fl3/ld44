@@ -1,10 +1,11 @@
 use crate::*;
-use rand::random;
+use rand::Rng;
+
 use std::f32::consts::PI;
 use tcod::chars::{BLOCK1, DCROSS, DHLINE, DNE, DNW, DSE, DSW, DTEEE, DTEEN, DTEES, DTEEW, DVLINE};
 use tcod::colors::{DARK_GREEN, GREEN};
 
-type TileMap = Vec<Vec<Tile>>;
+pub type TileMap = Vec<Vec<Tile>>;
 
 const DOOR_CH: char = '+';
 
@@ -202,6 +203,8 @@ fn draw_circle(floor_number: i32, map: &mut TileMap) {
     let step = 0.0001;
     let mut door_tick = 0.;
     while t <= PI * 2. {
+        use rand::Rng;
+
         let x = center + radius * t.cos();
         let y = center + radius * t.sin();
 
