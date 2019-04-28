@@ -364,7 +364,7 @@ fn info_panel(player: &Object, console: &mut console::Root) {
                 1,
                 BackgroundFlag::Set,
                 TextAlignment::Left,
-                "Miserable pilgrim",
+                &player.description,
             );
             panel.set_default_foreground(colors::WHITE);
 
@@ -489,6 +489,9 @@ fn make_floor(n: i32) -> Floor {
 
     for tile_row in tile_map.iter() {
         for tile in tile_row.iter() {
+            if get_object(tile.x, tile.y, &mut objects).is_some() {
+                continue;
+            }
             if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 200 == 0 {
                 objects.push(Object {
                     x: tile.x,
