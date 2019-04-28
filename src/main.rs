@@ -94,7 +94,7 @@ enum Mode {
     Attack,
 }
 
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
 pub enum ObjectType {
     Chest,
     Character,
@@ -132,6 +132,7 @@ impl Object {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Hash, Eq)]
 pub enum Item {
     Thing {
         description: String,
@@ -141,21 +142,17 @@ pub enum Item {
         kind: ObjectType,
         description: String,
     },
-    Gold {
-        amount: i32,
-    },
 }
 
 impl Item {
-    fn description(&self) -> &str {
+    fn description(&self) -> String {
         match self {
             Item::Thing {
                 ref description, ..
-            } => description.as_str(),
+            } => description.to_string(),
             Item::Life {
                 ref description, ..
-            } => description.as_str(),
-            Item::Gold { .. } => "gold",
+            } => format!("{}'s life", description.as_str()),
         }
     }
 }
@@ -228,7 +225,14 @@ fn attack(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i
     log::log("You beat the air in panic", colors::LIGHT_RED);
 }
 
-fn interact(player: &mut Object, map: &mut Map, objects: &mut [Object], dx: i32, dy: i32) {
+fn interact(
+    player: &mut Object,
+    map: &mut Map,
+    objects: &mut [Object],
+    trade: &mut trade::Trade,
+    dx: i32,
+    dy: i32,
+) {
     let x = player.x + dx;
     let y = player.y + dy;
 
@@ -245,6 +249,14 @@ fn interact(player: &mut Object, map: &mut Map, objects: &mut [Object], dx: i32,
                 log::log("You open a chest and start looting", colors::GREEN);
                 if object.content.len() == 0 {
                     log::log("Loot fairy says no", colors::RED);
+                } else {
+                    for loot in &object.content {
+                        log::log(
+                            &format!("you got {}", loot.description()),
+                            colors::DARKER_GREY,
+                        );
+                        player.content.push(loot.clone());
+                    }
                 }
                 object.visited = true;
             }
@@ -253,7 +265,7 @@ fn interact(player: &mut Object, map: &mut Map, objects: &mut [Object], dx: i32,
                     .iter()
                     .position(|object| object.x == x && object.y == y);
                 if let Some(index) = index {
-                    trade::open_window(index);
+                    trade.open(index);
                 }
             }
             ObjectType::Door => {
@@ -383,8 +395,12 @@ fn info_panel(player: &Object, console: &mut console::Root) {
         20,
         Some("Inventory"),
         |panel, _width, _| {
-            for (n, item) in player.content.iter().enumerate() {
-                panel.print(1, n as i32 + 1, format!(" - {}'s life", item.description()));
+            let mut map = std::collections::BTreeMap::<String, i32>::new();
+            for item in &player.content {
+                *map.entry(format!("{}", item.description())).or_insert(0) += 1;
+            }
+            for (n, (item, amount)) in map.iter().enumerate() {
+                panel.print(1, n as i32 + 1, format!(" - {}, x{}", item, amount))
             }
         },
     );
@@ -474,7 +490,7 @@ fn main() {
         ..objects::player()
     };
     let mut mode = Mode::Walk;
-    //let mut trade = None;
+    let mut trade = trade::Trade::default();
 
     for tile_row in tile_map.iter() {
         for tile in tile_row.iter() {
@@ -535,8 +551,8 @@ fn main() {
                     let angle = (tx as f64 / ty as f64).atan();
 
                     let color = if noise.get([angle * 100., n as f64 / 20.]).abs() + 0.2 > r {
-                        //Color::new(200, 160, 0)
-                        Color::new(150, 2, 0)
+                        Color::new(200, 160, 0)
+                    //Color::new(150, 2, 0)
                     } else {
                         Color::new(150, 0, 0)
                     };
@@ -575,15 +591,15 @@ fn main() {
             }
         }
 
-        root.put_char(player.x, player.y, '@', BackgroundFlag::Set);
+        root.put_char(player.x, player.y, player.ch, BackgroundFlag::Set);
 
-        if mode == Mode::Interact {
+        if mode == Mode::Interact || mode == Mode::Attack {
             root.print(0, FIELD_HEIGHT - 1, "Pick direction");
         }
 
         info_panel(&player, &mut root);
 
-        if trade::process(&mut root, &mut player, &mut objects) == false {
+        if trade.process(&mut root, &mut player, &mut objects) == false {
             root.flush();
             let key = root.wait_for_keypress(true);
 
@@ -629,7 +645,7 @@ fn main() {
                         attack(&mut player, &mut map, &mut objects, dx, dy);
                     }
                     Mode::Interact => {
-                        interact(&mut player, &mut map, &mut objects, dx, dy);
+                        interact(&mut player, &mut map, &mut objects, &mut trade, dx, dy);
                     }
                 }
 

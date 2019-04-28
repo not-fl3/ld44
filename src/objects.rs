@@ -1,6 +1,15 @@
 use crate::{Object, ObjectType};
 use tcod::colors;
 
+fn random_subset(names: &[&str]) -> Vec<crate::Item> {
+    let amount = (rand::random::<u32>() % 3) * (rand::random::<u32>() % 2);
+    (0..amount)
+        .map(|i| crate::Item::Thing {
+            description: names[rand::random::<usize>() % names.len()].into(),
+            gold: rand::random::<i32>() % 5,
+        })
+        .collect::<Vec<_>>()
+}
 pub fn player() -> Object {
     Object {
         x: 0,
@@ -26,7 +35,16 @@ pub fn chest() -> Object {
         kind: ObjectType::Chest,
         color: colors::DARK_BLUE,
         visited: false,
-        content: vec![],
+        content: random_subset(&[
+            "cursed diary",
+            "dried finger",
+            "silver coin",
+            "weird box",
+            "prism stone",
+            "broken bone",
+            "binocularus",
+            "uglified skull",
+        ]),
         opened: false,
     }
 }
@@ -41,7 +59,19 @@ pub fn graybeard() -> Object {
         kind: ObjectType::Character,
         color: colors::WHITE,
         visited: false,
-        content: vec![],
+        content: random_subset(&[
+            "cursed book",
+            "witch cloak",
+            "guardian armor",
+            "steel statuette",
+            "ripped pants",
+            "torn shirt",
+            "fig leaf",
+            "bunch of nails",
+            "unidentified poison",
+            "ancient key",
+            "yellow key",
+        ]),
         opened: false,
     }
 }
@@ -56,7 +86,7 @@ pub fn frog() -> Object {
         kind: ObjectType::Character,
         color: colors::GREEN,
         visited: false,
-        content: vec![],
+        content: random_subset(&["green foot", "green tail", "gren eyeball"]),
         opened: false,
     }
 }
