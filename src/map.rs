@@ -3,7 +3,6 @@ use rand::Rng;
 
 use std::f32::consts::PI;
 use tcod::chars::{BLOCK1, DCROSS, DHLINE, DNE, DNW, DSE, DSW, DTEEE, DTEEN, DTEES, DTEEW, DVLINE};
-use tcod::colors::{DARK_GREEN, GREEN};
 
 pub type TileMap = Vec<Vec<Tile>>;
 
@@ -64,8 +63,8 @@ pub fn make_map(
 }
 
 fn fill_objects(map: &mut TileMap, objects: &mut Vec<Object>) {
-    for (x, map_row) in map.iter_mut().enumerate() {
-        for (y, map_tile) in map_row.iter_mut().enumerate() {
+    for (_, map_row) in map.iter_mut().enumerate() {
+        for (_, map_tile) in map_row.iter_mut().enumerate() {
             if map_tile.ch == DOOR_CH {
                 objects.push(Object {
                     x: map_tile.x,
@@ -213,7 +212,7 @@ fn draw_circle(floor_number: i32, map: &mut TileMap) {
             door_tick = 0.;
         }
 
-        if (door_tick >= 2000.) {
+        if door_tick >= 2000. {
             map[x as usize][y as usize] = Tile {
                 x: x as i32,
                 y: y as i32,

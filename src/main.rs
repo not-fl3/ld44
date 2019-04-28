@@ -280,20 +280,14 @@ fn interact(
                 if *current_floor < FLOORS - 1 {
                     let gold = player.content.iter().fold(0, |sum, item| sum + item.gold());
                     if gold < 20 {
-                        log::log(
-                            &format!("Your cost should be more than 20 gold. You cost {}", gold),
-                            colors::DARK_RED,
-                        );
+                        log::log("Your cost should be more than 20 gold", colors::DARK_RED);
                         log::log(&format!("You cost {}", gold), colors::DARK_RED);
                     } else {
                         player.content.clear();
                         *current_floor += 1;
+                        log::log("All your item sacrificied to the door", colors::LIGHTER_RED);
                         log::log(
-                            "All your item sacrificied to the door.",
-                            colors::LIGHTER_RED,
-                        );
-                        log::log(
-                            "You ascended to the next level of the tower.",
+                            "You ascended to the next level of the tower",
                             colors::LIGHTER_RED,
                         );
                     }
@@ -342,7 +336,7 @@ pub fn panel<F: Fn(&mut OffscreenConsole, i32, i32)>(
     console::blit(&offscreen, (0, 0), (width, height), console, (x, y), 1., 1.);
 }
 
-fn info_panel(player: &Object, console: &mut console::Root) {
+fn info_panel(player: &Object, console: &mut console::Root, floor: usize) {
     panel(
         console,
         FIELD_WIDTH,
@@ -389,6 +383,15 @@ fn info_panel(player: &Object, console: &mut console::Root) {
                 TextAlignment::Right,
                 "Floor:",
             );
+            panel.set_default_foreground(colors::GREEN);
+            panel.print_ex(
+                width / 2 + 2,
+                4,
+                BackgroundFlag::Set,
+                TextAlignment::Left,
+                &format!("{}", floor + 1),
+            );
+            panel.set_default_foreground(colors::WHITE);
             for (n, _) in (0..player.humanity).enumerate() {
                 panel.put_char(
                     width / 2 + n as i32 * 2 + 2,
@@ -568,7 +571,7 @@ fn main() {
     let mut current_floor = 0;
 
     while !root.window_closed() {
-        let mut floor = &mut floors[current_floor];
+        let floor = &mut floors[current_floor];
 
         n += 1;
         root.clear();
@@ -668,7 +671,7 @@ fn main() {
                 }
             }
         }
-        info_panel(&player, &mut root);
+        info_panel(&player, &mut root, current_floor);
 
         if trade.process(&mut root, &mut player, &mut floor.objects) == false {
             root.flush();
