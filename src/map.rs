@@ -69,7 +69,7 @@ fn fill_objects(map: &mut TileMap, objects: &mut Vec<Object>) {
                         color: WHITE,
                         description: String::from("Closed door"),
                         humanity: 3,
-                        is_opened: false,
+                        visited: false,
                         kind: ObjectType::Door,
                         content: Vec::new(),
                     }
