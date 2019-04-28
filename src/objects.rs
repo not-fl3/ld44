@@ -45,11 +45,11 @@ impl Object {
 }
 
 fn random_subset(names: &[&str]) -> Vec<crate::Item> {
-    let amount = rand::random::<u32>() % 3;
+    let amount = rand::random::<u32>() % 5;
     (0..amount)
         .map(|_| crate::Item::Thing {
             description: names[rand::random::<usize>() % names.len()].into(),
-            gold: (rand::random::<i32>() % 2).abs(),
+            gold: (rand::random::<i32>() % 3).abs(),
         })
         .collect::<Vec<_>>()
 }

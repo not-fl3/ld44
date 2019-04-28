@@ -279,8 +279,8 @@ fn interact(
             ObjectType::UpStair => {
                 if *current_floor < FLOORS - 1 {
                     let gold = player.content.iter().fold(0, |sum, item| sum + item.gold());
-                    if gold < 20 {
-                        log::log("Your cost should be more than 20 gold", colors::DARK_RED);
+                    if gold < 7 {
+                        log::log("Your cost should be more than 7 gold", colors::DARK_RED);
                         log::log(&format!("You cost {}", gold), colors::DARK_RED);
                     } else {
                         player.content.clear();
