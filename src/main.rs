@@ -92,6 +92,7 @@ enum Mode {
     Walk,
     Interact,
     Attack,
+    Observe,
 }
 
 #[derive(PartialEq, Debug, Clone, Copy, Hash, Eq)]
@@ -457,6 +458,7 @@ fn info_panel(player: &Object, console: &mut console::Root) {
             panel.print(1, 2, "e - interact");
             panel.print(1, 3, ">/< - ascent/descent");
             panel.print(25, 1, "a - violently take life");
+            panel.print(25, 2, "; - toggle observe mode");
         },
     );
 }
@@ -470,6 +472,8 @@ fn main() {
     let mut map = Map::new(FIELD_WIDTH, FIELD_HEIGHT);
     let mut objects: Vec<Object> = vec![];
     let mut tile_map = make_map(&mut objects, FIELD_WIDTH as usize, FIELD_HEIGHT as usize, 1);
+    let mut observe_x = 0;
+    let mut observe_y = 1;
 
     log::log("You entered the tower of darkness", colors::GREEN);
     log::log("Your torch is going to fade out", colors::GREY);
@@ -605,6 +609,26 @@ fn main() {
             root.print(0, FIELD_HEIGHT - 1, "Pick direction");
         }
 
+        if mode == Mode::Observe {
+            root.put_char_ex(
+                observe_x,
+                observe_y,
+                '.',
+                colors::WHITE,
+                colors::DARKER_BLUE,
+            );
+            if let Some(object) = get_object(observe_x, observe_y, &mut objects) {
+                root.print(0, FIELD_HEIGHT - 1, &object.description);
+            } else {
+                if map.is_in_fov(observe_x, observe_y) == false {
+                    root.print(0, FIELD_HEIGHT - 1, "You cant see clearly in the dark");
+                } else if map.is_walkable(observe_x, observe_y) == false {
+                    root.print(0, FIELD_HEIGHT - 1, "Blank wall");
+                } else {
+                    root.print(0, FIELD_HEIGHT - 1, "Nothing");
+                }
+            }
+        }
         info_panel(&player, &mut root);
 
         if trade.process(&mut root, &mut player, &mut objects) == false {
@@ -631,6 +655,14 @@ fn main() {
                 Key { printable: 'a', .. } => {
                     mode = Mode::Attack;
                 }
+                Key { printable: ';', .. } if mode == Mode::Observe => {
+                    mode = Mode::Walk;
+                }
+                Key { printable: ';', .. } => {
+                    mode = Mode::Observe;
+                    observe_x = player.x;
+                    observe_y = player.y;
+                }
                 Key {
                     code: Enter,
                     alt: true,
@@ -648,16 +680,33 @@ fn main() {
                 match mode {
                     Mode::Walk => {
                         walk(&mut player, &mut map, &mut objects, dx, dy);
+                        mode = Mode::Walk;
                     }
                     Mode::Attack => {
                         attack(&mut player, &mut map, &mut objects, dx, dy);
+                        mode = Mode::Walk;
                     }
                     Mode::Interact => {
                         interact(&mut player, &mut map, &mut objects, &mut trade, dx, dy);
+                        mode = Mode::Walk;
+                    }
+                    Mode::Observe => {
+                        observe_x += dx;
+                        if observe_x < 0 {
+                            observe_x = 0;
+                        }
+                        if observe_x >= FIELD_WIDTH {
+                            observe_x = FIELD_WIDTH - 1;
+                        }
+                        observe_y += dy;
+                        if observe_y < 0 {
+                            observe_y = 0;
+                        }
+                        if observe_y >= FIELD_HEIGHT {
+                            observe_y = FIELD_HEIGHT - 1;
+                        }
                     }
                 }
-
-                mode = Mode::Walk;
             }
         }
 
