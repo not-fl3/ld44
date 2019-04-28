@@ -49,8 +49,9 @@ impl Trade {
                 sum
             }
         });
-        if *self.selected.get(&0).unwrap_or(&0) == 1
-            && gold >= objects[self.magic_index].life_equivalent
+        if (*self.selected.get(&0).unwrap_or(&0) == 1
+            && gold * 2 >= objects[self.magic_index].life_equivalent)
+            || gold >= objects[self.magic_index].life_equivalent + 2
         {
             self.deservables.life = true;
         } else {
@@ -60,6 +61,7 @@ impl Trade {
         let object = &objects[self.magic_index];
         while gold > 0 && object.content.len() != 0 {
             let item = object.content[rand::random::<usize>() % object.content.len()].clone();
+            assert!(item.gold() >= 0);
             self.deservables.items.push(item.clone());
             gold -= item.gold() + 1;
         }
@@ -135,11 +137,13 @@ impl Trade {
             console.height() - 27,
             Some("You deserve"),
             |panel, _, _| {
+                let mut wtf_start = 1;
                 if self.deservables.life {
                     panel.print(1, 2, "Other life");
+                    wtf_start = 2;
                 }
                 for (n, item) in self.deservables.items.iter().enumerate() {
-                    panel.print(1, n as i32 + 3, item.description());
+                    panel.print(1, n as i32 + 1 + wtf_start, item.description());
                 }
             },
         );
@@ -159,9 +163,19 @@ impl Trade {
             }
             Key { code: Enter, .. } => {
                 self.opened = false;
-                if self.deservables.life {
+                if self.selected.get(&0).map_or(false, |x| *x == 1) && self.deservables.life {
                     std::mem::swap(player, &mut objects[self.magic_index])
                 } else {
+                    if self.deservables.life {
+                        player.content.push(Item::Life {
+                            kind: objects[self.magic_index].kind,
+                            description: objects[self.magic_index].description.to_string(),
+                        });
+                        std::mem::replace(
+                            &mut objects[self.magic_index],
+                            crate::objects::garbage(),
+                        );
+                    }
                     for item in &self.deservables.items {
                         player.content.push(item.clone());
                     }

@@ -6,7 +6,7 @@ fn random_subset(names: &[&str]) -> Vec<crate::Item> {
     (0..amount)
         .map(|i| crate::Item::Thing {
             description: names[rand::random::<usize>() % names.len()].into(),
-            gold: rand::random::<i32>() % 5,
+            gold: (rand::random::<i32>() % 5).abs(),
         })
         .collect::<Vec<_>>()
 }
@@ -75,7 +75,7 @@ pub fn graybeard() -> Object {
             "yellow key",
         ]),
         opened: false,
-        life_equivalent: rand::random::<i32>() % 5 + 2,
+        life_equivalent: (rand::random::<i32>() % 5).abs() + 5,
     }
 }
 
@@ -91,7 +91,7 @@ pub fn frog() -> Object {
         visited: false,
         content: random_subset(&["green foot", "green tail", "gren eyeball"]),
         opened: false,
-        life_equivalent: rand::random::<i32>() % 5 + 1,
+        life_equivalent: (rand::random::<i32>() % 3).abs() + 1,
     }
 }
 
