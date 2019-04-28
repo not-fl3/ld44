@@ -22,6 +22,7 @@ pub fn player() -> Object {
         visited: false,
         content: vec![],
         opened: false,
+        life_equivalent: 10,
     }
 }
 
@@ -46,6 +47,7 @@ pub fn chest() -> Object {
             "uglified skull",
         ]),
         opened: false,
+        life_equivalent: 2,
     }
 }
 
@@ -73,6 +75,7 @@ pub fn graybeard() -> Object {
             "yellow key",
         ]),
         opened: false,
+        life_equivalent: rand::random::<i32>() % 5 + 2,
     }
 }
 
@@ -88,6 +91,7 @@ pub fn frog() -> Object {
         visited: false,
         content: random_subset(&["green foot", "green tail", "gren eyeball"]),
         opened: false,
+        life_equivalent: rand::random::<i32>() % 5 + 1,
     }
 }
 
@@ -103,5 +107,6 @@ pub fn garbage() -> Object {
         visited: false,
         content: vec![],
         opened: false,
+        life_equivalent: 0,
     }
 }

@@ -77,6 +77,7 @@ fn fill_objects(map: &mut TileMap, objects: &mut Vec<Object>) {
                     kind: ObjectType::Door,
                     content: Vec::new(),
                     opened: false,
+                    life_equivalent: 3,
                 })
             }
         }

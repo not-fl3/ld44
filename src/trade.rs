@@ -28,6 +28,7 @@ impl Trade {
         self.magic_index = index;
         self.selection = 0;
         self.selected.clear();
+        self.deservables = Deservables::default();
     }
 
     fn set_background(&self, panel: &mut OffscreenConsole, y: i32, n: usize) {
@@ -38,9 +39,29 @@ impl Trade {
         }
     }
 
-    fn update_deservables(&mut self) {
-        if *self.selected.get(&0).unwrap_or(&0) == 1 {
+    fn update_deservables(&mut self, player: &Object, objects: &[Object]) {
+        self.deservables = Deservables::default();
+
+        let mut gold = self.selected.iter().fold(0, |sum, (key, value)| {
+            if *key != 0 {
+                player.content[*key as usize - 1].gold() * value + sum
+            } else {
+                sum
+            }
+        });
+        if *self.selected.get(&0).unwrap_or(&0) == 1
+            && gold >= objects[self.magic_index].life_equivalent
+        {
             self.deservables.life = true;
+        } else {
+            self.deservables.life = false;
+        }
+
+        let object = &objects[self.magic_index];
+        while gold > 0 && object.content.len() != 0 {
+            let item = object.content[rand::random::<usize>() % object.content.len()].clone();
+            self.deservables.items.push(item.clone());
+            gold -= item.gold() + 1;
         }
     }
 
@@ -113,7 +134,14 @@ impl Trade {
             (console.width() - 20) / 2 - 3,
             console.height() - 27,
             Some("You deserve"),
-            |panel, width, _| {},
+            |panel, _, _| {
+                if self.deservables.life {
+                    panel.print(1, 2, "Other life");
+                }
+                for (n, item) in self.deservables.items.iter().enumerate() {
+                    panel.print(1, n as i32 + 3, item.description());
+                }
+            },
         );
 
         console.print(
@@ -131,7 +159,13 @@ impl Trade {
             }
             Key { code: Enter, .. } => {
                 self.opened = false;
-                std::mem::swap(player, &mut objects[self.magic_index])
+                if self.deservables.life {
+                    std::mem::swap(player, &mut objects[self.magic_index])
+                } else {
+                    for item in &self.deservables.items {
+                        player.content.push(item.clone());
+                    }
+                }
             }
 
             Key { code: Up, .. } => {
@@ -148,12 +182,14 @@ impl Trade {
                 let amount = self.selected.entry(self.selection as i32).or_insert(0);
                 if *amount > 0 {
                     *amount -= 1;
+                    self.update_deservables(player, objects);
                 }
             }
             Key { code: Right, .. } => {
                 let amount = self.selected.entry(self.selection as i32).or_insert(0);
                 if *amount == 0 {
                     *amount += 1;
+                    self.update_deservables(player, objects);
                 }
             }
             _ => {}

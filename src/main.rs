@@ -113,6 +113,7 @@ pub struct Object {
     pub content: Vec<Item>,
     pub visited: bool,
     pub opened: bool,
+    pub life_equivalent: i32,
 }
 
 impl Object {
@@ -153,6 +154,13 @@ impl Item {
             Item::Life {
                 ref description, ..
             } => format!("{}'s life", description.as_str()),
+        }
+    }
+
+    fn gold(&self) -> i32 {
+        match self {
+            Item::Thing { gold, .. } => *gold,
+            Item::Life { .. } => 1,
         }
     }
 }
