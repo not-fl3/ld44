@@ -12,6 +12,7 @@ pub fn player() -> Object {
         color: colors::WHITE,
         visited: false,
         content: vec![],
+        opened: false,
     }
 }
 
@@ -26,6 +27,7 @@ pub fn chest() -> Object {
         color: colors::DARK_BLUE,
         visited: false,
         content: vec![],
+        opened: false,
     }
 }
 
@@ -40,6 +42,7 @@ pub fn graybeard() -> Object {
         color: colors::WHITE,
         visited: false,
         content: vec![],
+        opened: false,
     }
 }
 
@@ -54,6 +57,7 @@ pub fn frog() -> Object {
         color: colors::GREEN,
         visited: false,
         content: vec![],
+        opened: false,
     }
 }
 
@@ -68,5 +72,6 @@ pub fn garbage() -> Object {
         color: colors::WHITE,
         visited: false,
         content: vec![],
+        opened: false,
     }
 }

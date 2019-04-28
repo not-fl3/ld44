@@ -112,6 +112,7 @@ pub struct Object {
     pub kind: ObjectType,
     pub content: Vec<Item>,
     pub visited: bool,
+    pub opened: bool,
 }
 
 impl Object {
@@ -120,7 +121,7 @@ impl Object {
             ObjectType::Chest => true,
             ObjectType::Character => false,
             ObjectType::Garbage => false,
-            ObjectType::Door => true,
+            ObjectType::Door => self.opened,
         }
     }
 
@@ -227,7 +228,7 @@ fn attack(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i
     log::log("You beat the air in panic", colors::LIGHT_RED);
 }
 
-fn interact(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy: i32) {
+fn interact(player: &mut Object, map: &mut Map, objects: &mut [Object], dx: i32, dy: i32) {
     let x = player.x + dx;
     let y = player.y + dy;
 
@@ -253,6 +254,40 @@ fn interact(player: &mut Object, map: &Map, objects: &mut [Object], dx: i32, dy:
                     .position(|object| object.x == x && object.y == y);
                 if let Some(index) = index {
                     trade::open_window(index);
+                }
+            }
+            ObjectType::Door => {
+                drop(object);
+
+                let mut doors = vec![];
+                let mut visited = std::collections::HashSet::new();
+                visited.insert((x, y));
+                doors.push((x, y));
+                while doors.len() != 0 {
+                    let door = doors.pop().unwrap();
+                    let deltas = [
+                        (1, 0),
+                        (-1, 0),
+                        (0, 1),
+                        (0, -1),
+                        (1, 1),
+                        (1, -1),
+                        (-1, 1),
+                        (-1, -1),
+                    ];
+                    for (dx, dy) in &deltas {
+                        let pos = (door.0 + dx, door.1 + dy);
+                        if let Some(object) = get_object(pos.0, pos.1, objects) {
+                            if visited.contains(&pos) == false && object.kind == ObjectType::Door {
+                                visited.insert(pos);
+                                doors.push(pos);
+                            }
+                        }
+                    }
+                    if let Some(object) = get_object(door.0, door.1, objects) {
+                        object.opened ^= true;
+                        map.set(object.x, object.y, object.opened, object.opened);
+                    }
                 }
             }
             _ => {}
@@ -443,7 +478,7 @@ fn main() {
 
     for tile_row in tile_map.iter() {
         for tile in tile_row.iter() {
-            if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 2000 == 0 {
+            if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 200 == 0 {
                 objects.push(Object {
                     x: tile.x,
                     y: tile.y,
@@ -457,7 +492,7 @@ fn main() {
                     ..objects::graybeard()
                 });
             }
-            if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 3100 == 0 {
+            if map.is_walkable(tile.x, tile.y) && rand::random::<i32>() % 310 == 0 {
                 objects.push(Object {
                     x: tile.x,
                     y: tile.y,
@@ -500,13 +535,13 @@ fn main() {
                     let angle = (tx as f64 / ty as f64).atan();
 
                     let color = if noise.get([angle * 100., n as f64 / 20.]).abs() + 0.2 > r {
-                        Color::new(200, 160, 0)
+                        //Color::new(200, 160, 0)
+                        Color::new(150, 2, 0)
                     } else {
                         Color::new(150, 0, 0)
                     };
                     if tile.ch == BLOCK1 {
                         root.put_char_ex(tile.x, tile.y, tile.ch, tile.color, Color::new(0, 0, 0));
-
                     } else {
                         root.put_char_ex(tile.x, tile.y, tile.ch, color, Color::new(0, 0, 0));
                     }
@@ -530,7 +565,13 @@ fn main() {
                     object.color
                 };
 
-                root.put_char_ex(object.x, object.y, object.ch, color, Color::new(0, 0, 0));
+                let ch = if object.kind == ObjectType::Door && object.opened {
+                    tcod::chars::VLINE
+                } else {
+                    object.ch
+                };
+
+                root.put_char_ex(object.x, object.y, ch, color, Color::new(0, 0, 0));
             }
         }
 
@@ -582,13 +623,13 @@ fn main() {
             if let Some((dx, dy)) = direction {
                 match mode {
                     Mode::Walk => {
-                        walk(&mut player, &map, &mut objects, dx, dy);
+                        walk(&mut player, &mut map, &mut objects, dx, dy);
                     }
                     Mode::Attack => {
-                        attack(&mut player, &map, &mut objects, dx, dy);
+                        attack(&mut player, &mut map, &mut objects, dx, dy);
                     }
                     Mode::Interact => {
-                        interact(&mut player, &map, &mut objects, dx, dy);
+                        interact(&mut player, &mut map, &mut objects, dx, dy);
                     }
                 }
 

@@ -1,8 +1,8 @@
 use crate::*;
-use std::f32::consts::PI;
-use tcod::chars::{DCROSS, DHLINE, DNE, DNW, DSE, DSW, DTEEE, DTEEN, DTEES, DTEEW, DVLINE, BLOCK1};
-use tcod::colors::{GREEN, DARK_GREEN};
 use rand::random;
+use std::f32::consts::PI;
+use tcod::chars::{BLOCK1, DCROSS, DHLINE, DNE, DNW, DSE, DSW, DTEEE, DTEEN, DTEES, DTEEW, DVLINE};
+use tcod::colors::{DARK_GREEN, GREEN};
 
 type TileMap = Vec<Vec<Tile>>;
 
@@ -53,7 +53,12 @@ pub fn make_map(
     //    fill_random(&mut map);
     smooth_walls(&mut map);
     fill_objects(&mut map, objects);
-
+    for object in objects {
+        if object.kind == ObjectType::Door {
+            map[object.y as usize][object.x as usize].walkable = false;
+            map[object.y as usize][object.x as usize].transparent = false;
+        }
+    }
     map
 }
 
@@ -61,19 +66,18 @@ fn fill_objects(map: &mut TileMap, objects: &mut Vec<Object>) {
     for (x, map_row) in map.iter_mut().enumerate() {
         for (y, map_tile) in map_row.iter_mut().enumerate() {
             if map_tile.ch == DOOR_CH {
-                objects.push(
-                    Object {
-                        x: map_tile.x,
-                        y: map_tile.y,
-                        ch: DOOR_CH,
-                        color: WHITE,
-                        description: String::from("Closed door"),
-                        humanity: 3,
-                        visited: false,
-                        kind: ObjectType::Door,
-                        content: Vec::new(),
-                    }
-                )
+                objects.push(Object {
+                    x: map_tile.x,
+                    y: map_tile.y,
+                    ch: DOOR_CH,
+                    color: WHITE,
+                    description: String::from("Closed door"),
+                    humanity: 3,
+                    visited: false,
+                    kind: ObjectType::Door,
+                    content: Vec::new(),
+                    opened: false,
+                })
             }
         }
     }
@@ -200,7 +204,7 @@ fn draw_circle(floor_number: i32, map: &mut TileMap) {
         let x = center + radius * t.cos();
         let y = center + radius * t.sin();
 
-        let door_chance: i32= rand::thread_rng().gen_range(0, 9000);
+        let door_chance: i32 = rand::thread_rng().gen_range(0, 9000);
         if door_chance > 8997 {
             door_tick = 0.;
         }
@@ -311,7 +315,9 @@ fn fill_empty(floor_number: i32, map: &mut TileMap) {
     if floor_number == 1 {
         for (x, map_row) in map.iter_mut().enumerate() {
             for (y, map_tile) in map_row.iter_mut().enumerate() {
-                if ((x as f32 - center).powi(2) as f32 + (y as f32 - center).powi(2) as f32).sqrt() < radius {
+                if ((x as f32 - center).powi(2) as f32 + (y as f32 - center).powi(2) as f32).sqrt()
+                    < radius
+                {
                     *map_tile = Tile {
                         x: x as i32,
                         y: y as i32,
@@ -326,7 +332,7 @@ fn fill_empty(floor_number: i32, map: &mut TileMap) {
                         x: x as i32,
                         y: y as i32,
                         walkable: true,
-                        color: Color::new(10,80,10),
+                        color: Color::new(10, 80, 10),
                         transparent: true,
                         description: String::from("Grass, it is green"),
                         ch: BLOCK1,
@@ -337,7 +343,9 @@ fn fill_empty(floor_number: i32, map: &mut TileMap) {
     } else {
         for (x, map_row) in map.iter_mut().enumerate() {
             for (y, map_tile) in map_row.iter_mut().enumerate() {
-                if ((x as f32 - center).powi(2) as f32 + (y as f32 - center).powi(2) as f32).sqrt() < radius {
+                if ((x as f32 - center).powi(2) as f32 + (y as f32 - center).powi(2) as f32).sqrt()
+                    < radius
+                {
                     *map_tile = Tile {
                         x: x as i32,
                         y: y as i32,
