@@ -1,7 +1,7 @@
 mod map;
 
 use rand::Rng;
-use tcod::colors::{BLACK, GREY};
+use tcod::colors::{BLACK, GREY, WHITE};
 use tcod::map::FovAlgorithm;
 
 use tcod::{
@@ -11,6 +11,7 @@ use tcod::{
 
 use crate::map::make_map;
 use noise::*;
+use tcod::chars::BLOCK1;
 
 mod log;
 mod objects;
@@ -20,6 +21,7 @@ pub struct Tile {
     x: i32,
     y: i32,
     ch: char,
+    color: Color,
     description: String,
     walkable: bool,
     transparent: bool,
@@ -30,6 +32,7 @@ impl Tile {
         x: i32,
         y: i32,
         ch: char,
+        color: Color,
         description: &str,
         walkable: bool,
         transparent: bool,
@@ -38,6 +41,7 @@ impl Tile {
             x,
             y,
             ch,
+            color,
             description: description.to_string(),
             walkable,
             transparent,
@@ -49,6 +53,7 @@ impl Tile {
             x,
             y,
             ch: '.',
+            color: WHITE,
             description: String::from("nothing here"),
             walkable: true,
             transparent: true,
@@ -61,6 +66,7 @@ impl Tile {
             transparent: false,
             x: 0,
             y: 0,
+            color: WHITE,
             ch: '#',
             description: String::from("This is a wall"),
         }
@@ -92,6 +98,7 @@ pub enum ObjectType {
     Chest,
     Character,
     Garbage,
+    Door,
 }
 
 pub struct Object {
@@ -112,6 +119,7 @@ impl Object {
             ObjectType::Chest => true,
             ObjectType::Character => false,
             ObjectType::Garbage => false,
+            ObjectType::Door => true,
         }
     }
 
@@ -392,8 +400,8 @@ fn main() {
     let mut n = 0;
 
     let mut player = Object {
-        x: FIELD_WIDTH / 2,
-        y: FIELD_HEIGHT / 2,
+        x: 10,
+        y: 10,
         ..objects::player()
     };
     let mut mode = Mode::Walk;
@@ -461,7 +469,12 @@ fn main() {
                     } else {
                         Color::new(150, 0, 0)
                     };
-                    root.put_char_ex(tile.x, tile.y, tile.ch, color, Color::new(0, 0, 0));
+                    if tile.ch == BLOCK1 {
+                        root.put_char_ex(tile.x, tile.y, tile.ch, tile.color, Color::new(0, 0, 0));
+
+                    } else {
+                        root.put_char_ex(tile.x, tile.y, tile.ch, color, Color::new(0, 0, 0));
+                    }
                 } else {
                     root.put_char_ex(
                         tile.x,

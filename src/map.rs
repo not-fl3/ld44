@@ -1,8 +1,12 @@
 use crate::*;
 use std::f32::consts::PI;
-use tcod::chars::{DCROSS, DHLINE, DNE, DNW, DSE, DSW, DTEEE, DTEEN, DTEES, DTEEW, DVLINE};
+use tcod::chars::{DCROSS, DHLINE, DNE, DNW, DSE, DSW, DTEEE, DTEEN, DTEES, DTEEW, DVLINE, BLOCK1};
+use tcod::colors::{GREEN, DARK_GREEN};
+use rand::random;
 
 type TileMap = Vec<Vec<Tile>>;
+
+const DOOR_CH: char = '+';
 
 pub fn make_map(
     objects: &mut Vec<Object>,
@@ -14,7 +18,7 @@ pub fn make_map(
 
     //    let rooms: Vec<Rect> = vec![];
 
-    fill_empty(&mut map);
+    fill_empty(floor_number, &mut map);
     draw_circle(floor_number, &mut map);
 
     make_rooms(floor_number, &mut map);
@@ -48,8 +52,31 @@ pub fn make_map(
 
     //    fill_random(&mut map);
     smooth_walls(&mut map);
+    fill_objects(&mut map, objects);
 
     map
+}
+
+fn fill_objects(map: &mut TileMap, objects: &mut Vec<Object>) {
+    for (x, map_row) in map.iter_mut().enumerate() {
+        for (y, map_tile) in map_row.iter_mut().enumerate() {
+            if map_tile.ch == DOOR_CH {
+                objects.push(
+                    Object {
+                        x: map_tile.x,
+                        y: map_tile.y,
+                        ch: DOOR_CH,
+                        color: WHITE,
+                        description: String::from("Closed door"),
+                        humanity: 3,
+                        is_opened: false,
+                        kind: ObjectType::Door,
+                        content: Vec::new(),
+                    }
+                )
+            }
+        }
+    }
 }
 
 fn smooth_walls(map: &mut TileMap) {
@@ -168,18 +195,39 @@ fn draw_circle(floor_number: i32, map: &mut TileMap) {
 
     let mut t = 0.;
     let step = 0.0001;
+    let mut door_tick = 0.;
     while t <= PI * 2. {
         let x = center + radius * t.cos();
         let y = center + radius * t.sin();
 
-        map[x as usize][y as usize] = Tile {
-            x: x as i32,
-            y: y as i32,
-            ch: '#',
-            walkable: false,
-            description: String::from("Tower wall"),
-            transparent: false,
-        };
+        let door_chance: i32= rand::thread_rng().gen_range(0, 9000);
+        if door_chance > 8997 {
+            door_tick = 0.;
+        }
+
+        if (door_tick >= 2000.) {
+            map[x as usize][y as usize] = Tile {
+                x: x as i32,
+                y: y as i32,
+                ch: '#',
+                color: WHITE,
+                walkable: false,
+                description: String::from("Tower wall"),
+                transparent: false,
+            };
+        } else {
+            map[x as usize][y as usize] = Tile {
+                x: x as i32,
+                y: y as i32,
+                ch: DOOR_CH,
+                color: WHITE,
+                walkable: true,
+                description: String::from("Door"),
+                transparent: false,
+            };
+
+            door_tick += 1.;
+        }
 
         t += step;
     }
@@ -189,8 +237,8 @@ fn make_rooms(floor_number: i32, map: &mut TileMap) {
     let radius = ((FIELD_WIDTH as f32 / (1. + floor_number as f32 * 0.10)) / 2.0) as f32;
     let center = (FIELD_WIDTH / 2) as f32;
 
-    draw_circle(floor_number + 3, map);
-    draw_circle(floor_number + 8, map);
+    draw_circle(floor_number + 5, map);
+    draw_circle(floor_number + 18, map);
 
     let random_angle = rand::thread_rng().gen_range(PI * 0.2, PI * 0.4);
     let mut current_ray_angle = random_angle;
@@ -213,6 +261,7 @@ fn make_rooms(floor_number: i32, map: &mut TileMap) {
                     x: x as i32,
                     y: y as i32,
                     ch: '#',
+                    color: WHITE,
                     walkable: false,
                     description: String::from("Tower wall"),
                     transparent: false,
@@ -255,17 +304,61 @@ fn make_rooms(floor_number: i32, map: &mut TileMap) {
 //    }
 //}
 
-fn fill_empty(map: &mut TileMap) {
-    for (x, map_row) in map.iter_mut().enumerate() {
-        for (y, map_tile) in map_row.iter_mut().enumerate() {
-            *map_tile = Tile {
-                x: x as i32,
-                y: y as i32,
-                walkable: true,
-                transparent: true,
-                description: String::from("Floor, you can step on it"),
-                ch: '.',
-            };
+fn fill_empty(floor_number: i32, map: &mut TileMap) {
+    let center = (FIELD_WIDTH / 2) as f32;
+    let radius = ((FIELD_WIDTH as f32 / (1. + floor_number as f32 * 0.10)) / 2.0) as f32;
+
+    if floor_number == 1 {
+        for (x, map_row) in map.iter_mut().enumerate() {
+            for (y, map_tile) in map_row.iter_mut().enumerate() {
+                if ((x as f32 - center).powi(2) as f32 + (y as f32 - center).powi(2) as f32).sqrt() < radius {
+                    *map_tile = Tile {
+                        x: x as i32,
+                        y: y as i32,
+                        walkable: true,
+                        color: WHITE,
+                        transparent: true,
+                        description: String::from("Floor, you can step on it"),
+                        ch: '.',
+                    };
+                } else {
+                    *map_tile = Tile {
+                        x: x as i32,
+                        y: y as i32,
+                        walkable: true,
+                        color: Color::new(10,80,10),
+                        transparent: true,
+                        description: String::from("Grass, it is green"),
+                        ch: BLOCK1,
+                    };
+                }
+            }
+        }
+    } else {
+        for (x, map_row) in map.iter_mut().enumerate() {
+            for (y, map_tile) in map_row.iter_mut().enumerate() {
+                if ((x as f32 - center).powi(2) as f32 + (y as f32 - center).powi(2) as f32).sqrt() < radius {
+                    *map_tile = Tile {
+                        x: x as i32,
+                        y: y as i32,
+                        walkable: true,
+                        color: WHITE,
+                        transparent: true,
+                        description: String::from("Floor, you can step on it"),
+                        ch: '.',
+                    };
+                } else {
+                    *map_tile = Tile {
+                        x: x as i32,
+                        y: y as i32,
+                        walkable: false,
+                        color: WHITE,
+                        transparent: true,
+                        description: String::from(""),
+                        ch: ' ',
+                    };
+                }
+            }
         }
     }
 }
